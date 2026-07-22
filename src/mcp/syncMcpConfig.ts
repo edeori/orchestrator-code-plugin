@@ -46,19 +46,32 @@ function syncClaudeProjectConfig(workspaceRoot: string, servers: Record<string, 
   fs.writeFileSync(mcpJsonPath, JSON.stringify(existing, null, 2) + "\n", "utf8");
 }
 
-/** Serializes one server entry as a `[mcp_servers.<name>]` TOML table. */
+/**
+ * Serializes one server entry as `[mcp_servers.<name>]` (+ a separate
+ * `[mcp_servers.<name>.env]` sub-table, if there's an env) — verified
+ * against the real `codex mcp add` CLI's own output (`codex mcp add
+ * test-probe --env FOO=bar -- /bin/echo hello` produces exactly this
+ * shape, not an inline `env = { ... }` table) rather than assumed from
+ * TOML syntax alone, so a hand-written entry looks identical to one the
+ * CLI itself would have written.
+ */
 function toTomlBlock(name: string, config: StdioMcpServerConfig): string {
   const lines = [`[mcp_servers.${name}]`, `command = ${JSON.stringify(config.command)}`];
   if (config.args?.length) {
     lines.push(`args = [${config.args.map((a) => JSON.stringify(a)).join(", ")}]`);
   }
   if (config.env && Object.keys(config.env).length > 0) {
-    const envEntries = Object.entries(config.env)
-      .map(([k, v]) => `${JSON.stringify(k)} = ${JSON.stringify(v)}`)
-      .join(", ");
-    lines.push(`env = { ${envEntries} }`);
+    lines.push("");
+    lines.push(`[mcp_servers.${name}.env]`);
+    for (const [k, v] of Object.entries(config.env)) {
+      lines.push(`${k} = ${JSON.stringify(v)}`);
+    }
   }
   return lines.join("\n");
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -75,7 +88,16 @@ function syncCodexConfig(servers: Record<string, StdioMcpServerConfig>): void {
   let content = fs.existsSync(configPath) ? fs.readFileSync(configPath, "utf8") : "";
 
   for (const [name, config] of Object.entries(servers)) {
-    const headerPattern = new RegExp(`\\[mcp_servers\\.${name}\\][\\s\\S]*?(?=\\n\\[|$)`, "g");
+    const escapedName = escapeRegExp(name);
+    // Consumes the server's own `[mcp_servers.<name>]` block AND any of
+    // its own dotted sub-tables (e.g. `[mcp_servers.<name>.env]`, which
+    // toTomlBlock emits separately, matching the real `codex mcp add`
+    // CLI's own output shape) — stopping only at a `[` that starts a
+    // genuinely different section, not one of this server's own.
+    const headerPattern = new RegExp(
+      `\\[mcp_servers\\.${escapedName}\\][\\s\\S]*?(?=\\n\\[(?!mcp_servers\\.${escapedName}\\.)|$)`,
+      "g"
+    );
     content = content.replace(headerPattern, "").trimEnd();
     content += (content.length > 0 ? "\n\n" : "") + toTomlBlock(name, config) + "\n";
   }

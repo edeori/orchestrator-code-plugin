@@ -61,7 +61,17 @@ palette. It reads the named servers from your global `~/.claude.json` and
 writes them into:
 
 - `<workspace>/.mcp.json` (Claude Code project-level config)
-- `~/.codex/config.toml` under `[mcp_servers.<name>]`
+- `~/.codex/config.toml` under `[mcp_servers.<name>]` (+ a separate
+  `[mcp_servers.<name>.env]` sub-table for env vars — the exact shape
+  `codex mcp add` itself produces, confirmed by running it once and
+  diffing the result; `codex mcp list`/`codex mcp get <name>` recognize a
+  synced entry correctly)
+
+Codex needs this step too, not just Claude — `codex exec` (what
+`agents/codexAgent.ts` spawns) loads `~/.codex/config.toml` automatically
+for any invocation, the same as Claude Code loads its own project
+`.mcp.json`, so a delegated Codex task only sees `code-graph` once this has
+been run at least once on a given machine.
 
 Only the server names you list in `orchestratorCode.mcpServers` are touched;
 everything else in your Codex config is left alone. Because server configs
