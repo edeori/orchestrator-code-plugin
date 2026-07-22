@@ -7,14 +7,16 @@ and delegates the actual work to either the `claude` (Claude Code) or `codex`
 
 Both agents can be given access to the same MCP servers (e.g. `code-graph`)
 so they share one view of the codebase regardless of which one handles a
-given task.
+given task. A "Scan" button on the chat panel also lets you trigger a
+`code-graph` scan of the current workspace directly, without going through
+either agent.
 
 ## Status
 
 This is an early scaffold: the activity bar icon, chat webview, Ollama-based
-router, CLI delegation, and MCP-server mirroring all work end-to-end, but the
-routing prompt, CLI flags, and error handling are intentionally minimal and
-meant to be iterated on.
+router, CLI delegation, MCP-server mirroring, and the code-graph scan button
+all work end-to-end, but the routing prompt, CLI flags, and error handling
+are intentionally minimal and meant to be iterated on.
 
 ## Architecture
 
@@ -24,7 +26,9 @@ src/extension.ts        activation, commands
 src/webview/            WebviewViewProvider for the chat panel
 src/orchestrator/        Ollama-based task router (claude vs codex)
 src/agents/              CLI subprocess wrappers for `claude` and `codex`
-src/mcp/                 mirrors MCP server definitions to both CLIs
+src/mcp/                 mirrors MCP server definitions to both CLIs; also a
+                         direct MCP client used by the "Scan" button
+src/scan/                best-effort language auto-detection for the picker
 ```
 
 Flow: user message in webview -> `OllamaRouter.route()` classifies the task
@@ -64,6 +68,35 @@ everything else in your Codex config is left alone. Because server configs
 can carry secrets (API keys, database passwords, etc.), the generated
 `.mcp.json` is gitignored by default in this repo's own `.gitignore` — treat
 it the same way in any workspace you sync into.
+
+## Scan button
+
+The search icon on the chat panel's title bar (**"Orchestrator: Scan Project
+into Code Graph"**) scans the current workspace and imports it into the
+shared `code-graph` Neo4j instance, tagged by project — the same
+`scan_project` MCP tool Claude/Codex would call themselves, invoked directly
+here via the MCP TypeScript SDK (`src/mcp/codeGraphClient.ts`), spawning
+`code-graph`'s registered command from `~/.claude.json` for the duration of
+one call. Flow:
+
+1. A cheap file-extension scan (`src/scan/detectLanguage.ts`) guesses the
+   likely language and puts it first in the picker — never the only way to
+   choose it.
+2. You confirm/change the language in a QuickPick (`java`,
+   `java-javaparser`, `javascript`, `cpp`, `cpp-clang` — see
+   [code-graph-mcp](https://github.com/edeori/code-graph-mcp)'s own README
+   for what each backend actually gives you).
+3. You confirm/change the **project tag** in an input box (defaults to the
+   workspace folder name) — this is what keeps multiple different
+   apps/repos searchable within the *same* shared graph without colliding;
+   rescanning the same tag replaces that project's own data, never anyone
+   else's.
+4. Results (files scanned, types imported) are shown as a notification and
+   logged into the chat panel.
+
+Requires `code-graph` to already be registered in your global
+`~/.claude.json` (see code-graph-mcp's own setup instructions) — this
+button doesn't configure that server itself, only calls it.
 
 ## Development
 

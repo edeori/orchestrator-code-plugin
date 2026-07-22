@@ -34,6 +34,10 @@ body {
   color: var(--vscode-errorForeground);
 }
 
+.scan {
+  color: var(--vscode-charts-green, var(--vscode-textLink-foreground));
+}
+
 #composer {
   display: flex;
   flex-direction: column;

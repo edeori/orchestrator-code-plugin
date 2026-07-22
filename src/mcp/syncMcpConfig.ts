@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-interface StdioMcpServerConfig {
+export interface StdioMcpServerConfig {
   type?: string;
   command: string;
   args?: string[];
@@ -12,11 +12,12 @@ interface StdioMcpServerConfig {
 /**
  * Reads named MCP server definitions from the user's global Claude Code config
  * (~/.claude.json) so the same servers can be mirrored into a workspace for
- * both Claude and Codex. Secrets (env vars, tokens embedded in args) travel
+ * both Claude and Codex (or spawned directly by this extension itself — see
+ * mcp/codeGraphClient.ts). Secrets (env vars, tokens embedded in args) travel
  * only through local, gitignored files — never through anything this
  * extension writes into version control or logs.
  */
-function readGlobalClaudeMcpServers(names: string[]): Record<string, StdioMcpServerConfig> {
+export function readGlobalClaudeMcpServers(names: string[]): Record<string, StdioMcpServerConfig> {
   const claudeConfigPath = path.join(os.homedir(), ".claude.json");
   if (!fs.existsSync(claudeConfigPath)) {
     return {};

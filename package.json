@@ -45,8 +45,23 @@
         "command": "orchestratorCode.focusChat",
         "title": "Orchestrator: Open Chat",
         "category": "Orchestrator"
+      },
+      {
+        "command": "orchestratorCode.scanProject",
+        "title": "Orchestrator: Scan Project into Code Graph",
+        "category": "Orchestrator",
+        "icon": "$(search)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "orchestratorCode.scanProject",
+          "when": "view == orchestratorCode.chatView",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Orchestrator Code",
       "properties": {
@@ -89,5 +104,8 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

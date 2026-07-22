@@ -9,22 +9,34 @@ type WebviewOutMessage =
   | { type: "routing"; agent: string; reason: string }
   | { type: "chunk"; text: string }
   | { type: "done"; exitCode: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "scan"; text: string };
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
   static readonly viewId = "orchestratorCode.chatView";
+
+  private webview: vscode.Webview | undefined;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = this.renderHtml(webviewView.webview);
+    this.webview = webviewView.webview;
 
     webviewView.webview.onDidReceiveMessage(async (message: WebviewInMessage) => {
       if (message.type === "userMessage") {
         await this.handleUserMessage(message.text, webviewView.webview);
       }
     });
+  }
+
+  /** Lets other commands (e.g. "Scan Project") log into the same chat
+   * panel instead of only showing a transient notification — the panel
+   * doubles as the extension's one activity log. A no-op if the panel
+   * hasn't been opened/resolved yet in this window. */
+  logScanMessage(text: string): void {
+    this.webview?.postMessage({ type: "scan", text } satisfies WebviewOutMessage);
   }
 
   private async handleUserMessage(text: string, webview: vscode.Webview): Promise<void> {

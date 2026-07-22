@@ -36,6 +36,9 @@
       case "error":
         appendLine(`Error: ${message.message}`, "error");
         break;
+      case "scan":
+        appendLine(message.text, "scan");
+        break;
     }
   });
 })();
