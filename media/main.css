@@ -1,0 +1,62 @@
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0;
+  padding: 8px;
+  box-sizing: border-box;
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+}
+
+#log {
+  flex: 1;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+#log > div {
+  margin-bottom: 6px;
+}
+
+.user {
+  color: var(--vscode-textLink-foreground);
+}
+
+.routing {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.error {
+  color: var(--vscode-errorForeground);
+}
+
+#composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+textarea {
+  resize: vertical;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  font-family: inherit;
+}
+
+button {
+  align-self: flex-end;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--vscode-button-hoverBackground);
+}

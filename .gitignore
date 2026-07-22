@@ -1,0 +1,11 @@
+out/
+node_modules/
+*.vsix
+.vscode-test/
+.DS_Store
+
+# Local, machine-specific MCP mirrors may contain secrets (env vars, tokens) -
+# never commit these, only the sanitized template is tracked.
+.orchestrator/mcp.local.json
+.mcp.json
+.codex/config.local.toml

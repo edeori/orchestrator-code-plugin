@@ -1,0 +1,93 @@
+{
+  "name": "orchestrator-code",
+  "displayName": "Orchestrator Code",
+  "description": "Local LLM orchestrator that routes coding tasks to Claude Code or Codex CLI, sharing MCP servers (e.g. code-graph) with both.",
+  "version": "0.1.0",
+  "publisher": "moth-production",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:orchestratorCode.chatView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "orchestratorCode",
+          "title": "Orchestrator",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "orchestratorCode": [
+        {
+          "id": "orchestratorCode.chatView",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "orchestratorCode.syncMcpServers",
+        "title": "Orchestrator: Sync MCP Servers to Claude & Codex",
+        "category": "Orchestrator"
+      },
+      {
+        "command": "orchestratorCode.focusChat",
+        "title": "Orchestrator: Open Chat",
+        "category": "Orchestrator"
+      }
+    ],
+    "configuration": {
+      "title": "Orchestrator Code",
+      "properties": {
+        "orchestratorCode.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Base URL of the local Ollama server used for task routing."
+        },
+        "orchestratorCode.ollamaModel": {
+          "type": "string",
+          "default": "qwen2.5-coder:7b",
+          "description": "Ollama model used to classify/route tasks between Claude and Codex."
+        },
+        "orchestratorCode.claudeCommand": {
+          "type": "string",
+          "default": "claude",
+          "description": "Command used to invoke the Claude Code CLI."
+        },
+        "orchestratorCode.codexCommand": {
+          "type": "string",
+          "default": "codex",
+          "description": "Command used to invoke the Codex CLI."
+        },
+        "orchestratorCode.mcpServers": {
+          "type": "array",
+          "default": [
+            "code-graph"
+          ],
+          "description": "Names of MCP servers (already configured in Claude Code's global config) to mirror into this workspace for both Claude and Codex."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
