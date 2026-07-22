@@ -38,6 +38,133 @@ body {
   color: var(--vscode-charts-green, var(--vscode-textLink-foreground));
 }
 
+.tool-use {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.meta {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+/* Per-agent color coding — a left border is enough to distinguish which
+   agent produced a line without fighting VS Code's own theme colors for
+   plain text. */
+.agent-claude {
+  border-left: 3px solid var(--vscode-charts-orange, #d97757);
+  padding-left: 6px;
+}
+
+.agent-codex {
+  border-left: 3px solid var(--vscode-charts-blue, #4a9eda);
+  padding-left: 6px;
+}
+
+.question,
+.permission {
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  padding: 8px;
+  margin: 6px 0;
+}
+
+.question-block {
+  margin-bottom: 8px;
+}
+
+.question-header {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--vscode-descriptionForeground);
+}
+
+.question-text {
+  margin: 2px 0 6px 0;
+}
+
+.question-options,
+.permission-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.question-option,
+.permission-button,
+.question-submit {
+  align-self: auto;
+  background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.question-option.selected {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.question-submit {
+  margin-top: 4px;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.permission-title {
+  font-weight: 600;
+}
+
+.permission-description {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  margin: 2px 0 6px 0;
+}
+
+.permission-button.deny {
+  background: var(--vscode-inputValidation-errorBackground, var(--vscode-errorForeground));
+}
+
+.usage-bar {
+  position: relative;
+  height: 16px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 3px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.usage-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: var(--vscode-charts-green, #3fb950);
+  transition: width 0.2s ease;
+}
+
+.usage-fill-warning {
+  background: var(--vscode-charts-orange, #d97757);
+}
+
+.usage-label {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 6px;
+  color: var(--vscode-foreground);
+  mix-blend-mode: difference;
+}
+
 #composer {
   display: flex;
   flex-direction: column;

@@ -2,8 +2,11 @@
 
 A VS Code extension that adds an activity-bar chat panel backed by a **local
 LLM orchestrator**. You describe a task; a local Ollama model classifies it
-and delegates the actual work to either the `claude` (Claude Code) or `codex`
-(Codex CLI) command-line tool, streaming their output back into the chat.
+and delegates the actual work to either Claude Code or Codex, streaming
+their output back into the chat — the same panel doubles as a real,
+interactive chat UI: it can pop up the same clarifying-question and
+permission dialogs you'd get from either tool's own CLI, live, right in the
+panel.
 
 Both agents can be given access to the same MCP servers (e.g. `code-graph`)
 so they share one view of the codebase regardless of which one handles a
@@ -13,27 +16,61 @@ either agent.
 
 ## Status
 
-This is an early scaffold: the activity bar icon, chat webview, Ollama-based
-router, CLI delegation, MCP-server mirroring, and the code-graph scan button
-all work end-to-end, but the routing prompt, CLI flags, and error handling
-are intentionally minimal and meant to be iterated on.
+- **Claude** — drives a real Claude Agent SDK session (`agents/claudeAgent.ts`),
+  not a subprocess text-pipe. This is what makes the interactive
+  question/permission dialogs and the live rate-limit gauge possible at all:
+  - `AskUserQuestion` tool calls render as a real multi-choice dialog in the
+    panel; your answer resumes the same session.
+  - Every other tool needing approval (Bash, Write, Edit, ...) renders as an
+    Allow once / Allow for session / Deny dialog, using the SDK's own
+    pre-rendered prompt text (`"Claude wants to use Write"`, etc.).
+  - A live usage bar tracks the 5-hour rate-limit window
+    (`rate_limit_event` messages) and falls back to session cost
+    (`total_cost_usd`) when rate-limit data isn't available (API-key
+    sessions, for example).
+  - All of the above verified live against a real session, not just typed
+    against the SDK's declarations — see `agents/claudeAgent.ts`'s own
+    comments for the two real gotchas that cost the most time: a
+    pre-existing `~/.claude/settings.json` allow-rule can silently bypass
+    `canUseTool` entirely unless `settingSources` excludes `'user'`, and
+    `AskUserQuestion`'s resume payload is keyed by the **question's full
+    text**, not an id/header, with multi-select answers comma-joined —
+    both undocumented in the type declarations alone.
+- **Codex** — still a deliberate placeholder (`agents/codexAgent.ts`): plain
+  `codex exec` subprocess, text-only streaming, no interactive dialogs, no
+  usage gauge. Codex's only richer control surface (`codex app-server`) is
+  an explicitly `[experimental]`, undocumented, ~100-method internal
+  protocol with no stable wire-format spec — building against it was
+  deferred rather than reverse-engineering something that could break on
+  any Codex update. See the class docstring for what was actually checked
+  (including the official `@openai/codex-sdk`, which turned out not to
+  expose an interactive approval callback either).
+- MCP-server mirroring and the code-graph scan button work end-to-end for
+  both agents already.
 
 ## Architecture
 
 ```
-media/                 webview client (chat UI: HTML/CSS/JS)
-src/extension.ts        activation, commands
-src/webview/            WebviewViewProvider for the chat panel
+media/                  webview client (chat UI: HTML/CSS/JS)
+src/extension.ts         activation, commands
+src/webview/             WebviewViewProvider for the chat panel — owns
+                         routing question/permission answers back to
+                         whichever agent is currently running
 src/orchestrator/        Ollama-based task router (claude vs codex)
-src/agents/              CLI subprocess wrappers for `claude` and `codex`
+src/agents/              agent.ts (shared interface), agentEvent.ts (the
+                         normalized event model both agents emit),
+                         claudeAgent.ts (Claude Agent SDK), codexAgent.ts
+                         (CLI subprocess placeholder)
 src/mcp/                 mirrors MCP server definitions to both CLIs; also a
                          direct MCP client used by the "Scan" button
 src/scan/                best-effort language auto-detection for the picker
 ```
 
 Flow: user message in webview -> `OllamaRouter.route()` classifies the task
--> the matching `Agent` spawns the corresponding CLI in the current
-workspace folder -> stdout/stderr chunks are streamed back into the webview.
+-> the matching `Agent` runs it, emitting `AgentEvent`s (text chunks, tool
+use, questions, permission requests, usage updates) -> `ChatViewProvider`
+tags each with the agent id (for color-coding) and forwards it to the
+webview, and routes the webview's answers back to the agent that asked.
 
 ## Prerequisites
 
