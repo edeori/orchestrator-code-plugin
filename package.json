@@ -1,11 +1,15 @@
 {
   "name": "orchestrator-code",
   "displayName": "Orchestrator Code",
-  "description": "Local LLM orchestrator that routes coding tasks to Claude Code or Codex CLI, sharing MCP servers (e.g. code-graph) with both.",
-  "version": "0.1.0",
+  "description": "Task orchestrator that routes coding work to persistent Claude Code or Codex sessions with Groq, local and cloud fallback routing.",
+  "version": "0.1.6",
   "publisher": "moth-production",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edeori/orchestrator-code-plugin.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -13,6 +17,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onView:orchestratorCode.chatView"
   ],
   "main": "./out/extension.js",
@@ -31,11 +36,23 @@
         {
           "id": "orchestratorCode.chatView",
           "name": "Chat",
-          "type": "webview"
+          "type": "webview",
+          "icon": "resources/icon.svg",
+          "contextualTitle": "Orchestrator Chat"
         }
       ]
     },
     "commands": [
+      {
+        "command": "orchestratorCode.setGroqApiKey",
+        "title": "Orchestrator: Set Groq API Key",
+        "category": "Orchestrator"
+      },
+      {
+        "command": "orchestratorCode.setOllamaCloudApiKey",
+        "title": "Orchestrator: Set Ollama Cloud API Key",
+        "category": "Orchestrator"
+      },
       {
         "command": "orchestratorCode.syncMcpServers",
         "title": "Orchestrator: Sync MCP Servers to Claude & Codex",
@@ -58,22 +75,37 @@
         {
           "command": "orchestratorCode.scanProject",
           "when": "view == orchestratorCode.chatView",
-          "group": "navigation"
+          "group": "navigation@1"
         }
       ]
     },
     "configuration": {
       "title": "Orchestrator Code",
       "properties": {
+        "orchestratorCode.groqModel": {
+          "type": "string",
+          "default": "llama-3.1-8b-instant",
+          "description": "Groq model used to classify tasks between Claude and Codex. Quota, transient and malformed-generation failures fall back to local Ollama, then Ollama Cloud."
+        },
         "orchestratorCode.ollamaBaseUrl": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "Base URL of the local Ollama server used for task routing."
+          "description": "Base URL of the local Ollama server used when Groq routing is quota-limited or cannot produce a valid decision."
         },
         "orchestratorCode.ollamaModel": {
           "type": "string",
-          "default": "qwen2.5-coder:7b",
-          "description": "Ollama model used to classify/route tasks between Claude and Codex."
+          "default": "qwen3:8b",
+          "description": "Local Ollama model used as the Groq routing fallback."
+        },
+        "orchestratorCode.ollamaCloudBaseUrl": {
+          "type": "string",
+          "default": "https://ollama.com",
+          "description": "Ollama Cloud host used when Groq routing fails and local Ollama is unavailable."
+        },
+        "orchestratorCode.ollamaCloudModel": {
+          "type": "string",
+          "default": "gpt-oss:20b",
+          "description": "Ollama Cloud model used as the final routing fallback. Configure its API key with the command palette."
         },
         "orchestratorCode.claudeCommand": {
           "type": "string",
@@ -83,7 +115,33 @@
         "orchestratorCode.codexCommand": {
           "type": "string",
           "default": "codex",
-          "description": "Command used to invoke the Codex CLI."
+          "description": "Custom Codex CLI command. The default uses the CLI version bundled with @openai/codex-sdk when available."
+        },
+        "orchestratorCode.delegateBridgeNodeCommand": {
+          "type": "string",
+          "default": "node",
+          "description": "Node executable Codex uses to launch the local 'delegate_to_claude' bridge tool (lets a Codex-led turn hand a subtask to Claude, e.g. for machine-control actions). Must resolve on Codex's own PATH, not just this extension's. Set to an absolute node path if Codex can't find 'node'."
+        },
+        "orchestratorCode.claudeModelAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "default",
+            "sonnet",
+            "opus",
+            "haiku"
+          ],
+          "description": "Claude model ids/aliases allowed for delegated work. The provider default is preferred; the safe list excludes credit-only models. Empty allows every model reported by the authenticated account."
+        },
+        "orchestratorCode.codexModelAllowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Codex model ids allowed for delegated work. The provider default is preferred. Empty allows every visible model reported by Codex App Server."
         },
         "orchestratorCode.mcpServers": {
           "type": "array",
@@ -97,17 +155,21 @@
   },
   "scripts": {
     "build": "tsc -p ./",
+    "test:router": "npm run build && node --test tests/router.test.js",
     "watch": "tsc -w -p ./",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "package:vsix": "./scripts/build-vsix.sh",
+    "install:vsix": "./scripts/build-vsix.sh --install"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.9.2",
     "typescript": "^5.4.0"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.218",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@openai/codex-sdk": "^0.145.0"
+    "@openai/codex-sdk": "0.145.0"
   }
 }

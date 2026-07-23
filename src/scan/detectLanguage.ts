@@ -6,6 +6,7 @@ const _SKIP_DIR_NAMES = new Set([
 ]);
 
 const _EXTENSION_TO_LANGUAGE: Record<string, string> = {
+  ".py": "python",
   ".java": "java",
   ".ts": "javascript",
   ".tsx": "javascript",
@@ -21,6 +22,13 @@ const _EXTENSION_TO_LANGUAGE: Record<string, string> = {
   ".hxx": "cpp",
 };
 
+export interface ProjectLanguageInspection {
+  likely: string | undefined;
+  counts: Readonly<Record<string, number>>;
+  visitedFiles: number;
+  truncated: boolean;
+}
+
 /**
  * Cheap, best-effort majority-vote over file extensions under a root —
  * just picks a sensible default for the language QuickPick, never the
@@ -28,12 +36,14 @@ const _EXTENSION_TO_LANGUAGE: Record<string, string> = {
  * huge repo doesn't make the "Scan" button feel unresponsive before the
  * picker even opens.
  */
-export function detectLikelyLanguage(root: string, fileBudget = 2000): string | undefined {
+export function inspectProjectLanguages(root: string, fileBudget = 10_000): ProjectLanguageInspection {
   const counts: Record<string, number> = {};
   let visited = 0;
+  let truncated = false;
 
   function walk(dir: string): void {
     if (visited >= fileBudget) {
+      truncated = true;
       return;
     }
     let entries: fs.Dirent[];
@@ -44,6 +54,7 @@ export function detectLikelyLanguage(root: string, fileBudget = 2000): string | 
     }
     for (const entry of entries) {
       if (visited >= fileBudget) {
+        truncated = true;
         return;
       }
       if (entry.isDirectory()) {
@@ -63,5 +74,14 @@ export function detectLikelyLanguage(root: string, fileBudget = 2000): string | 
   walk(root);
 
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  return sorted[0]?.[0];
+  return {
+    likely: sorted[0]?.[0],
+    counts,
+    visitedFiles: visited,
+    truncated,
+  };
+}
+
+export function detectLikelyLanguage(root: string, fileBudget = 10_000): string | undefined {
+  return inspectProjectLanguages(root, fileBudget).likely;
 }

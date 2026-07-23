@@ -1,8 +1,14 @@
 .vscode/**
 .vscode-test/**
+.git/**
+dist/**
+scripts/**
+tests/**
 src/**
 .gitignore
 tsconfig.json
 **/*.map
 **/*.ts
-node_modules/**
+.mcp.json
+.orchestrator/**
+.codex/**

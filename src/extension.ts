@@ -3,9 +3,10 @@ import * as vscode from "vscode";
 import { ChatViewProvider } from "./webview/ChatViewProvider";
 import { syncMcpServers } from "./mcp/syncMcpConfig";
 import { scanProject } from "./mcp/codeGraphClient";
-import { detectLikelyLanguage } from "./scan/detectLanguage";
+import { inspectProjectLanguages } from "./scan/detectLanguage";
 
 const _LANGUAGE_OPTIONS: Array<{ label: string; value: string; description: string }> = [
+  { label: "Python", value: "python", description: "standard-library AST — modules, classes, functions and imports" },
   { label: "Java", value: "java", description: "tree-sitter, fast, zero extra deps" },
   { label: "Java (JavaParser)", value: "java-javaparser", description: "more precise — nested types, resolved signatures; needs a JDK + built jar" },
   { label: "JavaScript / TypeScript", value: "javascript", description: "tree-sitter, React/Angular-aware" },
@@ -14,14 +15,48 @@ const _LANGUAGE_OPTIONS: Array<{ label: string; value: string; description: stri
 ];
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new ChatViewProvider(context.extensionUri);
+  const provider = new ChatViewProvider(context.extensionUri, context.workspaceState, context.secrets);
+  context.subscriptions.push(provider);
+  if (vscode.workspace.workspaceFolders?.length) {
+    void provider.initializeSessions().catch((error) => {
+      vscode.window.showWarningMessage(`Orchestrator session restore failed: ${(error as Error).message}`);
+    });
+  }
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, provider)
+    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewId, provider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("orchestratorCode.focusChat", async () => {
       await vscode.commands.executeCommand("orchestratorCode.chatView.focus");
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("orchestratorCode.setGroqApiKey", async () => {
+      const key = await vscode.window.showInputBox({
+        prompt: "Groq API key (free — get one at console.groq.com), used only for routing decisions",
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (!key) return;
+      await context.secrets.store(ChatViewProvider.groqApiKeySecret, key);
+      vscode.window.showInformationMessage("Orchestrator: Groq API key saved.");
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("orchestratorCode.setOllamaCloudApiKey", async () => {
+      const key = await vscode.window.showInputBox({
+        prompt: "Ollama Cloud API key, used only if both Groq routing and local Ollama are unavailable",
+        password: true,
+        ignoreFocusOut: true,
+      });
+      if (!key) return;
+      await context.secrets.store(ChatViewProvider.ollamaCloudApiKeySecret, key);
+      vscode.window.showInformationMessage("Orchestrator: Ollama Cloud API key saved.");
     })
   );
 
@@ -54,14 +89,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("orchestratorCode.scanProject", async () => {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      const workspaceFolder = await selectWorkspaceFolderForScan();
       if (!workspaceFolder) {
-        vscode.window.showWarningMessage("Orchestrator: open a workspace folder before scanning.");
+        if (!vscode.workspace.workspaceFolders?.length) {
+          vscode.window.showWarningMessage("Orchestrator: open a workspace folder before scanning.");
+        }
         return;
       }
       const workspaceRoot = workspaceFolder.uri.fsPath;
 
-      const likely = detectLikelyLanguage(workspaceRoot);
+      const inspection = inspectProjectLanguages(workspaceRoot);
+      const likely = inspection.likely;
       const ordered = likely
         ? [..._LANGUAGE_OPTIONS.filter((o) => o.value === likely), ..._LANGUAGE_OPTIONS.filter((o) => o.value !== likely)]
         : _LANGUAGE_OPTIONS;
@@ -71,6 +109,20 @@ export function activate(context: vscode.ExtensionContext): void {
         { placeHolder: likely ? `Language to scan (detected: ${likely})` : "Language to scan" }
       );
       if (!picked) {
+        return;
+      }
+
+      const sourceLanguage =
+        picked.value === "java-javaparser"
+          ? "java"
+          : picked.value === "cpp-clang"
+            ? "cpp"
+            : picked.value;
+      if (!inspection.truncated && (inspection.counts[sourceLanguage] ?? 0) === 0) {
+        const message =
+          `Scan not started: no ${picked.label} source files were found under ${workspaceRoot}.`;
+        vscode.window.showWarningMessage(`Orchestrator: ${message}`);
+        provider.logScanMessage(`[scan:${path.basename(workspaceRoot)}] ${message}`);
         return;
       }
 
@@ -108,6 +160,25 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     })
   );
+}
+
+async function selectWorkspaceFolderForScan(): Promise<vscode.WorkspaceFolder | undefined> {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  if (folders.length <= 1) return folders[0];
+
+  const selected = await vscode.window.showQuickPick(
+    folders.map((folder) => ({
+      label: `$(repo) ${folder.name}`,
+      description: folder.uri.fsPath,
+      folder,
+    })),
+    {
+      title: "Select project to scan",
+      placeHolder: "Only the selected workspace folder will be scanned",
+      matchOnDescription: true,
+    }
+  );
+  return selected?.folder;
 }
 
 export function deactivate(): void {}
